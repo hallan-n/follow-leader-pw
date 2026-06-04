@@ -1,72 +1,96 @@
+import os
 import time
+
 import pyautogui
 import pygetwindow as gw
-import keyboard
+from pynput import keyboard
 
-from rich.console import Console
-from rich.table import Table
-from rich.box import ROUNDED
-
-class FollowLeader:
-    console = Console()
-    x = None
-    y = None
-    leader = None
+positions = None
+leader = None
+title = None
 
 
-    def set_leader_window(self):
-        self.leader = gw.getActiveWindow()
-        self.show_instructions()
-        print('lider', self.leader._hWnd)
+def load_menu():
+    os.system("cls")
 
-    def get_pw_windows(self, title: str):
-        return gw.getWindowsWithTitle(title)
-        
-    def record_mouse(self):
-        self.x, self.y = pyautogui.position()
-        self.show_instructions()
+    print(
+        f"""
+Menu Principal
 
-    def focus_window(self, window):
-        window.restore()
+(F7)  Definir líder da PT  [{"✅" if leader else "❌"}]
+(F8)  Definir posição X e Y [{"✅" if positions else "❌"}]
+(F9)  Clicar
+(F10) Sair
+
+Título: {title or "-"}
+
+"""
+    )
+
+
+def set_leader_window():
+    global leader
+    global title
+    leader = gw.getActiveWindow()
+    title = leader.title
+    load_menu()
+
+
+def get_pw_windows(title: str):
+    return gw.getWindowsWithTitle(title)
+
+
+def record_mouse():
+    global positions
+    x, y = pyautogui.position()
+    positions = x, y
+    load_menu()
+
+
+def focus_window(window):
+    window.restore()
+    time.sleep(0.1)
+    window.activate()
+
+
+def follow_leader():
+    global positions
+    global leader
+
+    windows = get_pw_windows(leader.title)
+    for window in windows:
+        focus_window(window)
         time.sleep(0.1)
-        window.activate()
+        pyautogui.tripleClick(positions[0], positions[1])
+        time.sleep(0.1)
+        pyautogui.tripleClick(positions[0], positions[1])
+
+    focus_window(leader)
 
 
-    def follow_leader(self):
-        windows = self.get_pw_windows(self.leader.title)
-        for window in windows:
-            self.focus_window(window)
-            
-            time.sleep(0.1)
-            pyautogui.tripleClick(self.x, self.y)
-            time.sleep(0.1)
-            pyautogui.tripleClick(self.x, self.y)
+def main():
+    def on_press(key):
+        if key == keyboard.Key.f7:
+            set_leader_window()
+            load_menu()
 
-        self.focus_window(self.leader)
+        elif key == keyboard.Key.f8:
+            record_mouse()
+            load_menu()
+
+        elif key == keyboard.Key.f9:
+            follow_leader()
+            load_menu()
+
+        elif key == keyboard.Key.f10:
+            print("Até mais o/")
+            return False
+
+    load_menu()
+
+    with keyboard.Listener(on_press=on_press) as listener:
+        listener.join()
 
 
-    def build_instructions_table(self) -> Table:
-        table = Table(title="Atalhos", box=ROUNDED, show_edge=True, expand=False)
-
-        table.add_column("Tecla", justify="center", style="bold yellow", no_wrap=True)
-        table.add_column("Ação", style="bold white")
-        table.add_column("Valor atual", style="bold red")
-        
-        table.add_row("F7", "Selecione a janela do lider da PT", "Selecionado" if self.leader else "Aguardando")
-        table.add_row("F8", "Gravar localização do líder da PT", f"{self.x}, {self.y}" if self.x else "Aguardando")
-        table.add_row("F9", "Todos seguirem o líder", "-")
-        table.add_row("CTRL + C", "Sair do programa", "-")
-        return table    
-
-    def show_instructions(self):
-        self.console.clear()
-        self.console.print(self.build_instructions_table())
-
-    def main(self):
-        self.show_instructions()
-        keyboard.add_hotkey('F7', self.set_leader_window)
-        keyboard.add_hotkey('F8', self.record_mouse)
-        keyboard.add_hotkey('F9', self.follow_leader)
-        keyboard.wait()
-
-FollowLeader().main()
+if __name__ == "__main__":
+    main()
